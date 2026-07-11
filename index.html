@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="ja" class="h-full bg-slate-950">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>極上！なんでも鑑定ボード＆ゲーム</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=YakuHanJPs:wght@700&display=swap" rel="stylesheet">
+    <!-- Tone.js for Sound Synthesis -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', 'YakuHanJPs', sans-serif;
+        }
+
+        /* パタパタデジタルドラム 3D効果用スタイル */
+        .digit-container {
+            perspective: 300px;
+        }
+        .digit-card {
+            transform-style: preserve-3d;
+            transition: transform 0.25s ease-in-out;
+        }
+        .digit-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.375rem;
+            user-select: none;
+        }
+        .digit-front {
+            transform: rotateX(0deg);
+        }
+        .digit-back {
+            transform: rotateX(180deg);
+        }
+
+        /* 絢爛豪華なゴールドネオン枠 */
+        .gold-border {
+            box-shadow: 0 0 15px rgba(234, 179, 8, 0.2), inset 0 0 15px rgba(234, 179, 8, 0.2);
+            border: 3px solid rgba(234, 179, 8, 0.8);
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(2, 6, 23, 0.98) 100%);
+        }
+
+        /* ゴールドテキストグラデーション */
+        .gold-text {
+            background: linear-gradient(to bottom, #ffe066 0%, #f59e0b 50%, #d97706 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));
+        }
+
+        /* アニメーション */
+        @keyframes sparkle {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+        .sparkle-slow {
+            animation: sparkle 4s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-full flex flex-col text-slate-100 bg-radial-at-t from-slate-900 via-slate-950 to-black overflow-x-hidden">
+
+    <!-- ヘッダー -->
+    <header class="w-full bg-slate-950/80 border-b border-yellow-500/20 py-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-4 sticky top-0 z-40 backdrop-blur-md">
+        <div class="flex items-center gap-3">
+            <div class="bg-gradient-to-tr from-yellow-500 to-amber-400 p-2 rounded-xl shadow-lg shadow-yellow-500/10">
+                <i class="fa-solid fa-gavel text-black text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-lg md:text-xl font-black tracking-wide gold-text">
+                    極上！なんでも鑑定ボード
+                </h1>
+                <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Premium Appraisal Flip Simulator</p>
+            </div>
+        </div>
+
+        <!-- タブ切り替えボタン -->
+        <div class="flex bg-slate-900 p-1 rounded-full border border-slate-800">
+            <button id="btn-game-tab" onclick="switchTab('game')" class="px-5 py-2 rounded-full text-sm font-bold transition-all duration-300 bg-gradient-to-r from-amber-500 to-yellow-500 text-black shadow-md">
+                <i class="fa-solid fa-gamepad mr-1.5"></i> お宝鑑定ゲーム
+            </button>
+            <button id="btn-gen-tab" onclick="switchTab('gen')" class="px-5 py-2 rounded-full text-sm font-bold text-gray-400 hover:text-white transition-all duration-300">
+                <i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i> 自由ジェネレーター
+            </button>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-grow max-w-6xl w-full mx-auto p-4 flex flex-col gap-6">
+        
+        <!-- ================= [最上部配置] 操作＆スタートコントロールパネル ================= -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 【お宝鑑定ゲーム】スタートコントロール -->
+            <div id="game-controls-panel" class="bg-slate-900/80 border-2 border-yellow-500/30 rounded-2xl p-5 shadow-lg backdrop-blur-sm flex flex-col justify-between">
+                <div>
+                    <h3 class="text-base font-bold mb-3 flex items-center gap-2 text-yellow-400">
+                        <i class="fa-solid fa-circle-question"></i> あなたの目利き予想を入力
+                    </h3>
+                    
+                    <div class="flex gap-3">
+                        <div class="relative flex-grow">
+                            <input type="number" id="game-guess-input" placeholder="予想金額を入力 (例: 1500000)" class="w-full h-12 bg-slate-950 border-2 border-slate-700 rounded-xl px-4 text-lg font-bold text-white focus:outline-none focus:border-yellow-500 transition-colors pl-12">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-500">￥</span>
+                        </div>
+                        <button onclick="loadRandomItem()" class="h-12 bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2 border border-slate-700 shrink-0">
+                            <i class="fa-solid fa-shuffle"></i> 別のお宝
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 【自由ジェネレーター】スタートコントロール（デフォルト非表示） -->
+            <div id="gen-controls-panel" class="bg-slate-900/80 border-2 border-blue-500/30 rounded-2xl p-5 shadow-lg backdrop-blur-sm flex flex-col justify-between hidden">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">鑑定品名 / タイトル</label>
+                        <input type="text" id="gen-title-input" value="今月の全社員の努力の結晶" class="w-full h-10 bg-slate-950 border border-slate-700 rounded-lg px-3 text-sm text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">設定する鑑定額 (円)</label>
+                        <div class="relative">
+                            <input type="number" id="gen-price-input" value="5300000" class="w-full h-10 bg-slate-950 border border-slate-700 rounded-lg pr-3 text-base font-bold text-white focus:outline-none focus:border-blue-500 pl-8">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500">￥</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <select id="gen-speed" class="w-full h-10 bg-slate-950 border border-slate-700 rounded-lg px-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                            <option value="1200">ゆっくり (1.2秒)</option>
+                            <option value="800" selected>標準 (0.8秒)</option>
+                            <option value="400">スピーディー (0.4秒)</option>
+                            <option value="150">超高速 (0.15秒)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <select id="gen-sound" class="w-full h-10 bg-slate-950 border border-slate-700 rounded-lg px-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                            <option value="on" selected>サウンドあり</option>
+                            <option value="off">ミュート</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- クイックガイド/ヒントエリア -->
+            <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-5 flex flex-col justify-between">
+                <div id="game-quick-hint">
+                    <h4 class="text-xs font-bold text-amber-500 mb-1"><i class="fa-solid fa-lightbulb"></i> 目利きのプロのヒント</h4>
+                    <p id="item-hint" class="text-xs text-gray-300 leading-relaxed min-h-[48px]">
+                        お宝を読み込み中...
+                    </p>
+                </div>
+                <div id="gen-quick-hint" class="hidden">
+                    <h4 class="text-xs font-bold text-blue-400 mb-1"><i class="fa-solid fa-wand-magic-sparkles"></i> 演出の楽しみ方</h4>
+                    <p class="text-xs text-gray-300 leading-relaxed">
+                        タイトルと金額を設定したら、下のボードにある「鑑定スタート！」を押してください。結婚式や各種パーティーの余興、社内イベント等でドラムロール演出を行えます！
+                    </p>
+                </div>
+                <div class="text-center text-[10px] text-gray-500 mt-2 border-t border-slate-900 pt-2">
+                    ※鑑定を開始すると音が出ます。音量にご注意ください。
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= 中部：鑑定額パタパタボード ================= -->
+        <div class="w-full bg-slate-950/80 gold-border rounded-lg p-6 md:p-8 flex flex-col items-center shadow-2xl relative overflow-hidden">
+            <div class="absolute -top-10 -left-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl sparkle-slow"></div>
+            <div class="absolute -bottom-10 -right-10 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl sparkle-slow"></div>
+
+            <!-- ボード上部タイトル -->
+            <div class="text-center mb-6">
+                <span class="text-xs uppercase tracking-widest text-yellow-500 font-bold bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20">Evaluation Result</span>
+                <h2 id="board-title" class="text-xl md:text-3xl font-extrabold text-white mt-2 tracking-wide truncate max-w-xl">
+                    鑑定品：本日の鑑定額
+                </h2>
+            </div>
+
+            <!-- パタパタデジタルドラムボード -->
+            <div class="w-full overflow-x-auto py-4 flex justify-center">
+                <div class="flex items-center gap-1 md:gap-2 px-4 min-w-[320px] max-w-full justify-center">
+                    <div id="evaluation-board" class="flex gap-1 md:gap-2">
+                        <!-- スロットがJSで生成されるプレースホルダー -->
+                    </div>
+                    <div class="flex flex-col justify-end h-20 md:h-28 pb-2">
+                        <span class="text-xl md:text-3xl font-black gold-text self-end ml-1 md:ml-3">円</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ステータス・メッセージ表示 -->
+            <div id="board-message" class="text-center h-8 mt-2 text-sm md:text-lg font-bold text-yellow-400">
+                上のフォームに予想額を入力し、下の「オープン・ザ-・プライス！」を押してください！
+            </div>
+
+            <!-- ================= [新配置] ボード直下の小さめのスタートボタン＆リセット ================= -->
+            <div class="mt-6 flex gap-3 justify-center w-full max-w-xs">
+                <button id="btn-main-action" onclick="handleMainAction()" class="flex-grow bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-extrabold py-2 px-4 rounded-xl text-xs md:text-sm transition-all shadow-md shadow-yellow-600/10 active:scale-[0.98] flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-gavel text-xs"></i>
+                    <span>オープン・ザ・プライス！</span>
+                </button>
+                <button id="btn-reset-board" onclick="resetBoard()" class="bg-slate-800 hover:bg-slate-700 text-gray-300 font-bold px-4 rounded-xl text-xs transition-all border border-slate-700 shrink-0 hidden">
+                    リセット
+                </button>
+            </div>
+        </div>
+
+        <!-- ================= 下部：詳細情報パネル（ゲーム専用） ================= -->
+        <div id="game-detail-panel" class="w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 shadow-lg backdrop-blur-sm">
+            <!-- お宝ビジュアル -->
+            <div class="w-full md:w-2/5 h-48 md:h-64 bg-slate-950/80 rounded-xl flex items-center justify-center relative border border-slate-800/80 overflow-hidden shrink-0">
+                <div id="item-svg-container" class="w-40 h-40 flex items-center justify-center">
+                    <!-- JSで挿入されるお宝イラストSVG -->
+                </div>
+                <div class="absolute bottom-2 right-2 bg-black/60 px-3 py-1 rounded text-xs text-gray-400">
+                    鑑定依頼人: <span id="item-owner" class="text-white font-bold">田中さん (54歳)</span>
+                </div>
+            </div>
+
+            <!-- お宝説明 -->
+            <div class="flex-grow flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <span class="text-xs font-bold text-purple-400 uppercase tracking-wider">Appraisal Target</span>
+                            <h3 id="item-name" class="text-2xl font-bold text-yellow-400 mt-1">実家の納屋から出た黄金の仏像</h3>
+                        </div>
+                        <span id="item-difficulty" class="px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30 shrink-0">
+                            難易度: 激ムズ
+                        </span>
+                    </div>
+
+                    <p id="item-description" class="text-sm md:text-base text-gray-300 leading-relaxed min-h-[80px] mt-2">
+                        おじいちゃんが遺品整理の際に見つけたという、怪しげに光り輝く仏像。重さはズッシリとしているが、表面の金メッキが少し剥がれかけている気もする。果たして本物か？それとも昭和のレプリカか？
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ゲームスコア・履歴セクション -->
+        <div id="score-section" class="w-full bg-slate-900/30 border border-slate-800/50 rounded-2xl p-6 shadow-md backdrop-blur-xs">
+            <h3 class="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-award"></i> 鑑定履歴 & 実績
+            </h3>
+            <div id="empty-history" class="text-center py-6 text-gray-500 text-sm">
+                まだゲームをプレイしていません。お宝の鑑定額を予想してみましょう！
+            </div>
+            <div id="history-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 hidden">
+                <!-- 履歴カードがここに追加される -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="w-full text-center py-4 text-xs text-gray-600 border-t border-purple-950 bg-black/20 mt-6">
+        <p>© 2026 極上！なんでも鑑定ボード. All Rights Reserved. 音響演出・3Dフリップ・ゲームシステム完全再現.</p>
+    </footer>
+
+    <!-- ゲームロジック / 演出システム JS -->
+    <script>
+        // --- 鑑定品（お宝）データ定義 ---
+        const appraisalItems = [
+            {
+                name: "実家の納屋から出た黄金の仏像",
+                owner: "田中さん (54歳)",
+                description: "おじいちゃんが遺品整理の際に見つけたという、怪しげに金ピカに光り輝く仏像。重さはズッシリとしているが、表面の金メッキが少し剥がれかけている気もする。果たして本物か、それともお土産用のレプリカか…？",
+                hint: "本物の室町時代の金銅仏であれば数百万の値がつきますが、単なる昭和の真鍮鋳物お土産であれば5,000円程度です。",
+                actualValue: 3500000,
+                comment: "見事な室町時代の「金銅釈迦如来立像」の本物です！長年、煤にまみれていましたが、洗えばさらに輝きが増す逸品。本物の金鍍金（きんめっき）がしっかりと施されています。",
+                difficulty: "並",
+                svg: `<svg viewBox="0 0 100 100" class="w-32 h-32 text-amber-400 fill-current drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]">
+                    <path d="M50,15 C45,15 42,20 42,25 C42,30 45,35 50,35 C55,35 58,30 58,25 C58,20 55,15 50,15 Z M50,38 C38,38 34,48 34,60 C34,65 38,70 50,70 C62,70 66,65 66,60 C66,48 62,38 50,38 Z M45,70 L30,90 L70,90 L55,70 Z M50,8 C48,8 47,10 49,11 C48,12 49,14 51,13 C52,11 51,8 50,8 Z"/>
+                    <circle cx="50" cy="50" r="1.5" fill="#ef4444"/>
+                </svg>`
+            },
+            {
+                name: "昭和レトロな宇宙怪獣のソフビ人形",
+                owner: "佐藤さん (41歳)",
+                description: "1966年のテレビ放映当時に発売されたとされる、初期型の宇宙怪獣ソフビ。足の裏には当時のメーカーロゴが刻印されている。マニアの間で超プレミア品と囁かれるが…？",
+                hint: "箱付きで、かつ足の裏の刻印が初期ミスプリントバージョンであれば一気に跳ね上がります。",
+                actualValue: 850000,
+                comment: "これは1960年代後半に限定生産された「ガラモン」の初期ロット（通称マルサン1期パゴス足流用）の極めて希少なソフビです！色ハゲもなく、奇跡的な保存状態です！",
+                difficulty: "難",
+                svg: `<svg viewBox="0 0 100 100" class="w-32 h-32 text-emerald-500 fill-current drop-shadow-[0_0_6px_rgba(16,185,129,0.5)]">
+                    <path d="M50,10 C40,10 35,20 35,30 C35,35 38,40 42,43 C35,48 30,58 30,70 L35,85 L45,85 L47,75 L53,75 L55,85 L65,85 L70,70 C70,58 65,48 58,43 C62,40 65,35 65,30 C65,20 60,10 50,10 Z M42,25 C45,25 45,28 42,28 Z M58,25 C61,25 61,28 58,28 Z M32,55 L22,58 L32,65 Z M68,55 L78,58 L68,65 Z"/>
+                </svg>`
+            },
+            {
+                name: "織田信長が家臣に与えたとされる茶碗",
+                owner: "木村さん (62歳)",
+                description: "「これを本能寺の変の3日前に拝領した」と一族に伝わる黒い和茶碗。箱書きには高名な茶人の署名があるが、どこか新しさを感じる佇まいもある。本物か、それとも江戸期の写しか？",
+                hint: "信長ゆかりの戦国茶器なら数千万円超え確実。しかし、大正時代に作られた非常に巧みな観光用の写し物である可能性もあります。",
+                actualValue: 15000,
+                comment: "非常に残念ながら、こちらは大正時代に作られた「復刻レプリカ品」です。形は非常によく写されていますが、土の質が現代に近く、本物の安土桃山期の風情は再現できていません。",
+                difficulty: "激ムズ",
+                svg: `<svg viewBox="0 0 100 100" class="w-32 h-32 text-stone-500 fill-current drop-shadow-[0_0_4px_rgba(0,0,0,0.5)]">
+                    <path d="M15,35 C15,35 20,75 50,75 C80,75 85,35 85,35 C85,35 75,40 50,40 C25,40 15,35 15,35 Z M35,75 L38,85 L62,85 L65,75 Z"/>
+                    <line x1="20" y1="42" x2="80" y2="45" stroke="#78716c" stroke-width="2"/>
+                </svg>`
+            },
+            {
+                name: "古代エジプトの『ファラオの護符』",
+                owner: "加藤さん (32歳)",
+                description: "エジプト旅行の際、カイロの怪しげな骨董市で「これは発掘された本物のミイラの胸飾りにあった」と語る謎の老婆から大金で買い取ったとされるスカラベ（フンコロガシ）の青いお守り。",
+                hint: "古代のエジプト本物であれば貴重な歴史資料ですが、現地で外国人観光客相手に量産されている粘土細工の可能性が極めて高いです。",
+                actualValue: 500,
+                comment: "完全に現代の「お土産用の安価な石膏細工」です。裏側に刻まれたヒエログリフもデタラメに彫られたもので、歴史的価値はありません。旅の思い出として大切にしてください。",
+                difficulty: "易",
+                svg: `<svg viewBox="0 0 100 100" class="w-32 h-32 text-cyan-400 fill-current drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">
+                    <path d="M50,15 C40,15 30,25 30,45 C30,65 40,85 50,85 C60,85 70,65 70,45 C70,25 60,15 50,15 Z M42,30 C45,30 45,35 42,35 Z M58,30 C61,30 61,35 58,35 Z M50,45 L50,85 M30,45 L70,45 M35,60 C45,65 55,65 65,60"/>
+                </svg>`
+            },
+            {
+                name: "落書きだらけの古いエレキギター",
+                owner: "高橋さん (28歳)",
+                description: "叔父の家を片付けた際に見つかった、ステッカーだらけで傷だらけの古いギター。裏面に殴り書きで「J.H.」とサインがしてあるが、叔父いわく『アメリカのフェスティバルで貰った』とのこと。",
+                hint: "1960年代後半のFender Stratocaster本物、さらに伝説のギタリスト「ジミ・ヘンドリックス」本人の直筆サインであれば、億単位になることも…。",
+                actualValue: 24000000,
+                comment: "奇跡が起きました！こちらは1968年製の本物ビンテージフェンダー。さらに裏側のサインは、文字鑑定の結果「ジミ・ヘンドリックス」本人の真筆であることが判明！家が建つレベルのお宝です！",
+                difficulty: "極限",
+                svg: `<svg viewBox="0 0 100 100" class="w-32 h-32 text-red-500 fill-current drop-shadow-[0_0_6px_rgba(239,68,68,0.5)]">
+                    <path d="M45,20 L50,15 L55,20 L52,50 L65,60 C70,65 70,75 60,82 C50,88 40,88 35,80 C30,72 32,62 40,58 Z M49,15 L49,5 M46,5 L52,5"/>
+                    <circle cx="38" cy="72" r="3" fill="#ffffff"/>
+                    <path d="M38,72 Q45,65 48,74" stroke="#ffffff" stroke-width="1.5" fill="none"/>
+                </svg>`
+            }
+        ];
+
+        // --- 音響システム (Tone.jsを使用したシンセ音生成) ---
+        let currentItem = null;
+        let isAppraising = false;
+        let activeTimer = null;
+        let currentTab = 'game'; // 'game' or 'gen'
+
+        // シンセサイザーオブジェクトのプレースホルダー
+        let synth, noise, filter, noiseFilter, fmSynth;
+
+        function initAudio() {
+            // ブラウザのセキュリティ制限（自動再生ブロック）を回避
+            if (typeof Tone !== 'undefined') {
+                Tone.start();
+            }
+
+            if (synth) return; // 初期化済みならスキップ
+            
+            try {
+                // ドラム回転音やピキーン用FM音源
+                fmSynth = new Tone.FMSynth({
+                    harmonicity: 3,
+                    modulationIndex: 10,
+                    detune: 0,
+                    oscillator: { type: "sine" },
+                    envelope: { attack: 0.005, decay: 0.1, sustain: 0.01, release: 0.2 },
+                    modulation: { type: "square" },
+                    modulationEnvelope: { attack: 0.005, decay: 0.05, sustain: 0, release: 0.1 }
+                }).toDestination();
+                fmSynth.volume.value = -12;
+
+                // ファンファーレ用高音質ポリフォニックシンセ
+                synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "triangle" },
+                    envelope: { attack: 0.05, decay: 0.1, sustain: 0.7, release: 0.3 }
+                }).toDestination();
+                synth.volume.value = -6;
+
+            } catch (e) {
+                console.warn("Audio Initialization failed or not supported in this browser:", e);
+            }
+        }
+
+        // サウンド設定の取得
+        function isSoundOn() {
+            if (currentTab === 'game') return true;
+            const select = document.getElementById('gen-sound');
+            return select ? select.value === 'on' : true;
+        }
+
+        // パタパタ音（ドラム回転中の短いパルス音）
+        function playTickSound() {
+            if (!isSoundOn()) return;
+            initAudio();
+            if (fmSynth) {
+                try {
+                    fmSynth.triggerAttackRelease("C3", "0.01", undefined, 0.5);
+                } catch (e) {}
+            }
+        }
+
+        // 桁確定音
+        function playConfirmSound() {
+            if (!isSoundOn()) return;
+            initAudio();
+            if (fmSynth) {
+                try {
+                    fmSynth.triggerAttackRelease("E6", "0.03", undefined, 0.8);
+                    setTimeout(() => {
+                        try { fmSynth.triggerAttackRelease("B6", "0.08", undefined, 0.6); } catch(err){}
+                    }, 40);
+                } catch (e) {}
+            }
+        }
+
+        // 大成功ファンファーレ音
+        function playFanfare() {
+            if (!isSoundOn()) return;
+            initAudio();
+            if (!synth) return;
+
+            try {
+                const now = Tone.now();
+                synth.triggerAttackRelease(["C4", "E4", "G4"], "0.15", now);
+                synth.triggerAttackRelease(["C4", "E4", "G4"], "0.15", now + 0.2);
+                synth.triggerAttackRelease(["E4", "G4", "C5"], "0.4", now + 0.4);
+                
+                setTimeout(() => {
+                    try { synth.triggerAttackRelease(["G4", "B4", "D5", "G5"], "0.8", Tone.now()); } catch(e){}
+                }, 800);
+            } catch (e) {}
+        }
+
+        // ガッカリ音
+        function playDisappointmentSound() {
+            if (!isSoundOn()) return;
+            initAudio();
+            if (!synth) return;
+
+            try {
+                const now = Tone.now();
+                synth.triggerAttackRelease(["F3", "Ab3", "B3"], "0.3", now);
+                setTimeout(() => {
+                    try { synth.triggerAttackRelease(["E3", "G3", "Bb3"], "0.6", Tone.now()); } catch(e){}
+                }, 400);
+            } catch (e) {}
+        }
+
+        // --- 画面構築とタブ切り替え ---
+        const DIGIT_UNITS = ["千億", "百億", "十億", "億", "千万", "百万", "十万", "万", "千", "百", "十", "一"];
+
+        // ボードに12個のデジットスロットを生成 (右側が 一の位 = 0)
+        function createBoard() {
+            const board = document.getElementById('evaluation-board');
+            if (!board) return;
+            board.innerHTML = '';
+            
+            // 12個の枠を作る。i=0が「千億」(最も左)、i=11が「一」(最も右)
+            for (let i = 0; i < 12; i++) {
+                const digitWrapper = document.createElement('div');
+                digitWrapper.className = "flex flex-col items-center";
+                
+                let labelColor = "text-gray-400";
+                if (DIGIT_UNITS[i].includes("億")) labelColor = "text-red-400 font-bold";
+                else if (DIGIT_UNITS[i].includes("万")) labelColor = "text-yellow-500 font-bold";
+
+                const unitLabel = document.createElement('span');
+                unitLabel.className = `text-[9px] md:text-xs font-bold mb-1 ${labelColor} h-4`;
+                unitLabel.innerText = DIGIT_UNITS[i];
+                
+                const digitBox = document.createElement('div');
+                // 一の位をインデックス0とするため、11 - i でスロットIDを付与
+                const slotIndex = 11 - i;
+                digitBox.id = `digit-slot-${slotIndex}`; 
+                digitBox.className = "digit-container w-6 h-10 md:w-11 md:h-18 text-lg md:text-4xl border border-slate-700 rounded-lg shadow-inner bg-slate-950";
+                
+                digitBox.innerHTML = `
+                    <div class="digit-card w-full h-full relative" id="card-${slotIndex}">
+                        <div class="digit-face digit-front" id="front-${slotIndex}">-</div>
+                        <div class="digit-face digit-back" id="back-${slotIndex}">-</div>
+                    </div>
+                `;
+                
+                digitWrapper.appendChild(unitLabel);
+                digitWrapper.appendChild(digitBox);
+                board.appendChild(digitWrapper);
+            }
+        }
+
+        // タブ切り替え
+        function switchTab(tab) {
+            currentTab = tab;
+            const btnGame = document.getElementById('btn-game-tab');
+            const btnGen = document.getElementById('btn-gen-tab');
+            
+            const gameControls = document.getElementById('game-controls-panel');
+            const genControls = document.getElementById('gen-controls-panel');
+            const gameQuickHint = document.getElementById('game-quick-hint');
+            const genQuickHint = document.getElementById('gen-quick-hint');
+            
+            const gameDetail = document.getElementById('game-detail-panel');
+            const scoreSec = document.getElementById('score-section');
+
+            const mainActionBtn = document.getElementById('btn-main-action');
+            const resetBtn = document.getElementById('btn-reset-board');
+
+            if (!btnGame || !btnGen || !gameControls || !genControls || !gameDetail || !scoreSec) return;
+
+            if (tab === 'game') {
+                btnGame.className = "px-5 py-2 rounded-full text-sm font-bold transition-all duration-300 bg-gradient-to-r from-amber-500 to-yellow-500 text-black shadow-md";
+                btnGen.className = "px-5 py-2 rounded-full text-sm font-bold text-gray-400 hover:text-white transition-all duration-300";
+                
+                gameControls.classList.remove('hidden');
+                genControls.classList.add('hidden');
+                gameQuickHint.classList.remove('hidden');
+                genQuickHint.classList.add('hidden');
+                
+                gameDetail.classList.remove('hidden');
+                scoreSec.classList.remove('hidden');
+
+                if (mainActionBtn) {
+                    mainActionBtn.className = "flex-grow bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-extrabold py-2 px-4 rounded-xl text-xs md:text-sm transition-all shadow-md shadow-yellow-600/10 active:scale-[0.98] flex items-center justify-center gap-2";
+                    mainActionBtn.innerHTML = `<i class="fa-solid fa-gavel text-xs"></i> <span>オープン・ザ・プライス！</span>`;
+                }
+                if (resetBtn) resetBtn.classList.add('hidden');
+                
+                document.getElementById('board-title').innerText = `鑑定品：${currentItem ? currentItem.name : 'お宝鑑定ゲーム'}`;
+                document.getElementById('board-message').innerText = '上のフォームに予想額を入力し、下の「オープン・ザ-・プライス！」を押してください！';
+            } else {
+                btnGen.className = "px-5 py-2 rounded-full text-sm font-bold transition-all duration-300 bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md";
+                btnGame.className = "px-5 py-2 rounded-full text-sm font-bold text-gray-400 hover:text-white transition-all duration-300";
+                
+                gameControls.classList.add('hidden');
+                genControls.classList.remove('hidden');
+                gameQuickHint.classList.add('hidden');
+                genQuickHint.classList.remove('hidden');
+                
+                gameDetail.classList.add('hidden');
+                scoreSec.classList.add('hidden');
+
+                if (mainActionBtn) {
+                    mainActionBtn.className = "flex-grow bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-extrabold py-2 px-4 rounded-xl text-xs md:text-sm transition-all shadow-md shadow-indigo-600/10 active:scale-[0.98] flex items-center justify-center gap-2";
+                    mainActionBtn.innerHTML = `<i class="fa-solid fa-play text-xs"></i> <span>鑑定スタート！</span>`;
+                }
+                if (resetBtn) resetBtn.classList.remove('hidden');
+                
+                const customTitle = document.getElementById('gen-title-input').value;
+                document.getElementById('board-title').innerText = `鑑定品：${customTitle || '自由設定'}`;
+                document.getElementById('board-message').innerText = '上の設定を入力し、下の「鑑定スタート！」を押してください！';
+            }
+            resetBoard();
+        }
+
+        // ボードの状態を完全にリセット
+        function resetBoard() {
+            isAppraising = false;
+            
+            for (let i = 0; i < 12; i++) {
+                const card = document.getElementById(`card-${i}`);
+                const front = document.getElementById(`front-${i}`);
+                const back = document.getElementById(`back-${i}`);
+                
+                if (card && front && back) {
+                    card.style.transform = "rotateX(0deg)";
+                    front.innerText = "-";
+                    front.className = "digit-face digit-front bg-slate-950 text-slate-700 border-slate-900";
+                    back.innerText = "-";
+                    back.className = "digit-face digit-back bg-slate-950 text-slate-700 border-slate-900";
+                }
+            }
+            const msg = document.getElementById('board-message');
+            if (msg) {
+                if (currentTab === 'game') {
+                    msg.innerText = "上のフォームに予想額を入力し、下の「オープン・ザ-・プライス！」を押してください！";
+                } else {
+                    msg.innerText = "上の設定を入力し、下の「鑑定スタート！」を押してください！";
+                }
+                msg.className = "text-center h-8 mt-2 text-sm md:text-lg font-bold text-yellow-500";
+            }
+        }
+
+        // デジット単体のドラム回転アニメーション
+        function startDrumRolling(digitIndex) {
+            const front = document.getElementById(`front-${digitIndex}`);
+            const back = document.getElementById(`back-${digitIndex}`);
+            if (!front || !back) return null;
+
+            front.className = "digit-face digit-front bg-gradient-to-b from-blue-600 to-blue-900 text-white border-blue-400";
+            back.className = "digit-face digit-back bg-gradient-to-b from-blue-600 to-blue-900 text-white border-blue-400";
+
+            let tempValue = 0;
+            const intervalId = setInterval(() => {
+                tempValue = (tempValue + 1) % 10;
+                front.innerText = tempValue;
+                back.innerText = tempValue;
+                playTickSound();
+            }, 60);
+
+            return intervalId;
+        }
+
+        // デジット確定処理
+        function stopDrumRolling(digitIndex, finalValue, rollIntervalId, isLeadingZero = false) {
+            if (rollIntervalId) clearInterval(rollIntervalId);
+            
+            const card = document.getElementById(`card-${digitIndex}`);
+            const front = document.getElementById(`front-${digitIndex}`);
+            const back = document.getElementById(`back-${digitIndex}`);
+
+            if (!card || !front || !back) return;
+
+            if (isLeadingZero) {
+                // 金額の桁よりも上にある位：パタパタを止めて、表示を空白にし、無点灯状態の背景にする
+                front.innerText = "";
+                back.innerText = "";
+                front.className = "digit-face digit-front bg-slate-950 text-slate-800 border-slate-900";
+                back.className = "digit-face digit-back bg-slate-950 text-slate-800 border-slate-900";
+                card.style.transform = "rotateX(0deg)";
+                return;
+            }
+
+            // 有効な金額の桁：ピキーンと音を鳴らして数値を確定表示
+            front.innerText = finalValue;
+            back.innerText = finalValue;
+
+            front.className = "digit-face digit-front bg-gradient-to-b from-blue-500 via-blue-600 to-blue-800 text-white border-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.4)]";
+            back.className = "digit-face digit-back bg-gradient-to-b from-blue-500 via-blue-600 to-blue-800 text-white border-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.4)]";
+
+            card.style.transform = "rotateX(180deg)";
+            playConfirmSound();
+        }
+
+        // 一の位から順にパタパタ表示するコアルーチン
+        function animateEvaluation(targetAmount, speedMs, onComplete) {
+            initAudio();
+            isAppraising = true;
+            resetBoard();
+
+            const amountStr = targetAmount.toString();
+            const len = amountStr.length; // 設定された金額の有効桁数
+
+            const activeIntervals = {};
+
+            // 【超演出改善】最初は金額に関係なく、全12桁すべてのデジタルドラムを一斉に回転させる！
+            // これにより、パタパタがすべて止まるまで最終的な金額の桁数が一切分からないようになります。
+            for (let i = 0; i < 12; i++) {
+                activeIntervals[i] = startDrumRolling(i);
+            }
+
+            // 右側の一の位 (0) から左に向かって、12桁すべてを順番に停止判定していく
+            let currentIndex = 0;
+
+            function stopNext() {
+                if (currentIndex < len) {
+                    // 有効な金額の桁：文字を切り出して数字を確定（フリップ表示＋確定SE）
+                    const charPos = len - 1 - currentIndex;
+                    const digitChar = amountStr.charAt(charPos);
+                    const finalValue = parseInt(digitChar);
+
+                    stopDrumRolling(currentIndex, finalValue, activeIntervals[currentIndex], false);
+                    currentIndex++;
+                    
+                    // 次の桁の確定スケジュール
+                    setTimeout(stopNext, speedMs);
+                } else {
+                    // 【極上演出】最高位（一番上の位）が確定した瞬間、
+                    // それより左側の残りのパタパタ（千万・億など不要な位）を一斉に、瞬時に停止して消灯させる
+                    for (let i = len; i < 12; i++) {
+                        if (activeIntervals[i]) {
+                            stopDrumRolling(i, "", activeIntervals[i], true);
+                        }
+                    }
+                    // すべての演出判定が完了
+                    isAppraising = false;
+                    if (onComplete) onComplete();
+                }
+            }
+
+            // 演出開始から少し溜めてから、一の位から順次停止を開始
+            setTimeout(stopNext, 800);
+        }
+
+        // 鑑定処理のアクション統一ハンドラー
+        function handleMainAction() {
+            if (isAppraising) return;
+            if (currentTab === 'game') {
+                startGameAppraisal();
+            } else {
+                startGenAppraisal();
+            }
+        }
+
+        // --- お宝鑑定ゲームシステム ---
+        let gameHistory = [];
+
+        function loadRandomItem() {
+            if (isAppraising) return;
+            resetBoard();
+            
+            let nextItem;
+            do {
+                nextItem = appraisalItems[Math.floor(Math.random() * appraisalItems.length)];
+            } while (currentItem && nextItem.name === currentItem.name && appraisalItems.length > 1);
+
+            currentItem = nextItem;
+
+            document.getElementById('item-name').innerText = currentItem.name;
+            document.getElementById('item-description').innerText = currentItem.description;
+            document.getElementById('item-hint').innerText = currentItem.hint;
+            document.getElementById('item-owner').innerText = currentItem.owner;
+            document.getElementById('item-difficulty').innerText = `難易度: ${currentItem.difficulty}`;
+            document.getElementById('item-svg-container').innerHTML = currentItem.svg;
+
+            if (currentTab === 'game') {
+                document.getElementById('board-title').innerText = `鑑定品：${currentItem.name}`;
+            }
+            
+            const guessInput = document.getElementById('game-guess-input');
+            if (guessInput) guessInput.value = '';
+            
+            const diffBadge = document.getElementById('item-difficulty');
+            if (diffBadge) {
+                if (currentItem.difficulty === '易') {
+                    diffBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400 border border-green-500/30 shrink-0";
+                } else if (currentItem.difficulty === '並') {
+                    diffBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 shrink-0";
+                } else if (currentItem.difficulty === '難') {
+                    diffBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30 shrink-0";
+                } else {
+                    diffBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30 shrink-0 animate-pulse";
+                }
+            }
+        }
+
+        function startGameAppraisal() {
+            if (isAppraising) return;
+            
+            initAudio();
+
+            const guessInput = document.getElementById('game-guess-input');
+            const guessVal = parseInt(guessInput ? guessInput.value : '');
+            if (isNaN(guessVal) || guessVal < 0) {
+                showToast("有効な予想金額を入力してください！");
+                return;
+            }
+
+            const targetVal = currentItem.actualValue;
+            const speed = 600; // 0.6秒間隔でパタパタ進む
+
+            const mainActionBtn = document.getElementById('btn-main-action');
+            if (mainActionBtn) mainActionBtn.disabled = true;
+
+            animateEvaluation(targetVal, speed, () => {
+                if (mainActionBtn) mainActionBtn.disabled = false;
+                
+                const diff = Math.abs(guessVal - targetVal);
+                const pct = targetVal === 0 ? 0 : (diff / targetVal) * 100;
+                
+                let resultMessage = "";
+                let bgClass = "text-yellow-400";
+                let isASuccess = true;
+
+                if (diff === 0) {
+                    resultMessage = "ピタリ賞！！！神眼を持つ伝説の鑑定士誕生！";
+                    bgClass = "text-emerald-400 text-lg md:text-xl font-black animate-bounce";
+                    isASuccess = true;
+                } else if (pct <= 12) {
+                    resultMessage = `ほぼピタリ！誤差 ${pct.toFixed(1)}%！超一流の目利き！`;
+                    bgClass = "text-green-400 font-bold";
+                    isASuccess = true;
+                } else if (pct <= 35) {
+                    resultMessage = `お見事！誤差 ${pct.toFixed(1)}%。なかなかの目利きです。`;
+                    bgClass = "text-yellow-300";
+                    isASuccess = true;
+                } else if (pct <= 65) {
+                    resultMessage = `凡人レベル。誤差 ${pct.toFixed(1)}%。修行が必要です。`;
+                    bgClass = "text-amber-500";
+                    isASuccess = false;
+                } else {
+                    resultMessage = `大ハズレ！誤差 ${pct.toFixed(1)}%。騙されやすいタイプです…`;
+                    bgClass = "text-red-500 font-extrabold";
+                    isASuccess = false;
+                }
+
+                if (isASuccess) {
+                    playFanfare();
+                } else {
+                    playDisappointmentSound();
+                }
+
+                const boardMsg = document.getElementById('board-message');
+                if (boardMsg) {
+                    boardMsg.innerText = resultMessage;
+                    boardMsg.className = `text-center h-auto mt-2 text-sm md:text-xl font-bold ${bgClass}`;
+                }
+
+                // モーダル表示
+                setTimeout(() => {
+                    showGameResultModal(guessVal, targetVal, currentItem.comment, pct);
+                }, 1000);
+                
+                addHistory(currentItem.name, guessVal, targetVal, pct);
+            });
+        }
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = "fixed bottom-5 left-1/2 -translate-x-1/2 bg-yellow-500 text-black font-bold px-6 py-3 rounded-full shadow-lg z-50 text-sm";
+            toast.innerText = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function showGameResultModal(guess, actual, comment, pct) {
+            const modal = document.createElement('div');
+            modal.className = "fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in";
+            
+            let rank = "鑑定難民";
+            let rankColor = "text-red-500";
+            if (pct === 0) { rank = "伝説 of 神眼鑑定士"; rankColor = "text-yellow-400"; }
+            else if (pct <= 12) { rank = "超一流目利きマスター"; rankColor = "text-green-400"; }
+            else if (pct <= 35) { rank = "本物を見破りし俊英"; rankColor = "text-cyan-400"; }
+            else if (pct <= 65) { rank = "一般鑑定市民"; rankColor = "text-amber-500"; }
+
+            modal.innerHTML = `
+                <div class="bg-slate-900 border-2 border-yellow-500/50 rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl relative">
+                    <div class="absolute -top-10 left-1/2 -translate-x-1/2 w-20 h-20 bg-gradient-to-tr from-amber-500 to-yellow-300 rounded-full flex items-center justify-center shadow-lg shadow-yellow-500/30 border-4 border-slate-900">
+                        <i class="fa-solid fa-gavel text-black text-2xl"></i>
+                    </div>
+                    
+                    <div class="text-center mt-8 mb-6">
+                        <span class="text-[10px] font-bold text-yellow-500 uppercase tracking-widest">Appraisal Score</span>
+                        <h3 class="text-xl font-bold mt-1 text-white">鑑定判定結果</h3>
+                        <div class="text-2xl font-black mt-2 ${rankColor} tracking-wider">${rank}</div>
+                    </div>
+
+                    <div class="space-y-3 bg-slate-950 p-4 rounded-xl border border-slate-800 mb-6">
+                        <div class="flex justify-between items-center pb-2 border-b border-slate-800/60">
+                            <span class="text-xs text-gray-400">あなたの予想鑑定額</span>
+                            <span class="text-base font-bold text-white">￥${guess.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between items-center pb-2 border-b border-slate-800/60">
+                            <span class="text-xs text-yellow-500 font-bold">本物の真実鑑定額</span>
+                            <span class="text-lg font-black text-yellow-400">￥${actual.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-400">目利き誤差率</span>
+                            <span class="text-xs font-bold text-red-400">${pct.toFixed(1)}%</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <h4 class="text-xs font-bold text-yellow-500 mb-1.5 flex items-center gap-1">
+                            <i class="fa-solid fa-comments"></i> 鑑定士の総評
+                        </h4>
+                        <p class="text-xs text-gray-300 leading-relaxed bg-slate-950/40 p-3 rounded-lg border border-slate-800/60 max-h-32 overflow-y-auto">
+                            ${comment}
+                        </p>
+                    </div>
+
+                    <button id="btn-close-modal" class="w-full bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-extrabold py-3 px-6 rounded-xl hover:opacity-90 transition-opacity text-sm">
+                        次のお宝に挑戦する
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            document.getElementById('btn-close-modal').addEventListener('click', () => {
+                modal.remove();
+                loadRandomItem();
+            });
+        }
+
+        function addHistory(itemName, guess, actual, pct) {
+            gameHistory.unshift({ itemName, guess, actual, pct });
+            
+            const emptyHist = document.getElementById('empty-history');
+            const histList = document.getElementById('history-list');
+            if (!emptyHist || !histList) return;
+            
+            emptyHist.classList.add('hidden');
+            histList.classList.remove('hidden');
+
+            histList.innerHTML = '';
+            gameHistory.slice(0, 6).forEach((item) => {
+                const card = document.createElement('div');
+                card.className = "bg-slate-950/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between";
+                
+                let evaluationText = "大外れ";
+                let colorClass = "text-red-400 border-red-500/20 bg-red-500/10";
+                if (item.pct === 0) { evaluationText = "ピタリ!"; colorClass = "text-yellow-400 border-yellow-500/20 bg-yellow-500/10"; }
+                else if (item.pct <= 15) { evaluationText = "一流"; colorClass = "text-green-400 border-green-500/20 bg-green-500/10"; }
+                else if (item.pct <= 40) { evaluationText = "並目利き"; colorClass = "text-blue-400 border-blue-500/20 bg-blue-500/10"; }
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-[11px] text-gray-400 font-bold truncate max-w-[140px]">${item.itemName}</span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold border ${colorClass}">${evaluationText}</span>
+                    </div>
+                    <div class="space-y-1 text-xs text-gray-300">
+                        <div class="flex justify-between">
+                            <span>予想:</span>
+                            <span class="font-bold">￥${item.guess.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between text-yellow-400 font-bold">
+                            <span>鑑定:</span>
+                            <span>￥${item.actual.toLocaleString()}</span>
+                        </div>
+                    </div>
+                `;
+                histList.appendChild(card);
+            });
+        }
+
+        // --- 自由演出ジェネレーターの開始 ---
+        function startGenAppraisal() {
+            if (isAppraising) return;
+
+            initAudio();
+
+            const titleInput = document.getElementById('gen-title-input');
+            const priceInput = document.getElementById('gen-price-input');
+            const speedSelect = document.getElementById('gen-speed');
+
+            const title = (titleInput ? titleInput.value : '') || "お宝の価値";
+            const price = parseInt(priceInput ? priceInput.value : '');
+            const speed = parseInt(speedSelect ? speedSelect.value : '800');
+
+            if (isNaN(price) || price < 0 || price > 999999999999) {
+                showToast("12桁以内（9999億円以内）の正しい金額を入力してください。");
+                return;
+            }
+
+            document.getElementById('board-title').innerText = `鑑定品：${title}`;
+            
+            const mainActionBtn = document.getElementById('btn-main-action');
+            if (mainActionBtn) mainActionBtn.disabled = true;
+
+            animateEvaluation(price, speed, () => {
+                if (mainActionBtn) mainActionBtn.disabled = false;
+                
+                const boardMsg = document.getElementById('board-message');
+                if (boardMsg) {
+                    boardMsg.innerText = `鑑定終了！ 鑑定結果：${title} は ${price.toLocaleString()}円です！`;
+                    boardMsg.className = "text-center h-auto mt-2 text-sm md:text-xl font-bold text-yellow-400 animate-bounce";
+                }
+                
+                playFanfare();
+            });
+        }
+
+        // --- ウィンドウロード時の初期化 ---
+        window.onload = function () {
+            createBoard();
+            resetBoard();
+            loadRandomItem();
+        }
+    </script>
+</body>
+</html>
