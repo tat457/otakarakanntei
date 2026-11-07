@@ -154,10 +154,10 @@
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <select id="gen-speed" class="w-full h-10 bg-slate-950 border border-slate-700 rounded-lg px-2 text-xs text-white focus:outline-none focus:border-blue-500">
-                                <option value="1200">ゆっくり (1.2秒)</option>
-                                <option value="800" selected>標準 (0.8秒)</option>
+                                <option value="1800">超じっくり (1.8秒)</option>
+                                <option value="1200" selected>じっくり (1.2秒)</option>
+                                <option value="800">標準 (0.8秒)</option>
                                 <option value="400">スピーディー (0.4秒)</option>
-                                <option value="150">超高速 (0.15秒)</option>
                             </select>
                         </div>
                         <div>
@@ -670,6 +670,30 @@
             return intervalId;
         }
 
+        // 最高位専用：ドラム回転をゆっくり（スローダウン）させてドキドキ感を演出する関数
+        function slowDownDrumRolling(digitIndex, oldIntervalId) {
+            if (oldIntervalId) clearInterval(oldIntervalId);
+            
+            const front = document.getElementById(`front-${digitIndex}`);
+            const back = document.getElementById(`back-${digitIndex}`);
+            if (!front || !back) return null;
+
+            // 緊張感演出：ゴールドのド派手な輝きとパルスアニメーション
+            front.className = "digit-face digit-front bg-gradient-to-b from-amber-500 via-yellow-600 to-amber-700 text-white border-2 border-yellow-200 text-xl sm:text-4xl md:text-5xl font-black shadow-[0_0_25px_rgba(250,204,21,0.9)] animate-pulse";
+            back.className = "digit-face digit-back bg-gradient-to-b from-amber-500 via-yellow-600 to-amber-700 text-white border-2 border-yellow-200 text-xl sm:text-4xl md:text-5xl font-black shadow-[0_0_25px_rgba(250,204,21,0.9)] animate-pulse";
+
+            let tempValue = 0;
+            // 回転速度を 380ms に落として重厚な「パ・・・タ・・・パ・・・タ」という超スローテンポにする
+            const newIntervalId = setInterval(() => {
+                tempValue = (tempValue + 1) % 10;
+                front.innerText = tempValue;
+                back.innerText = tempValue;
+                playTickSound();
+            }, 380);
+
+            return newIntervalId;
+        }
+
         // デジット確定処理
         function stopDrumRolling(digitIndex, finalValue, rollIntervalId, isLeadingZero = false) {
             if (rollIntervalId) clearInterval(rollIntervalId);
@@ -723,16 +747,32 @@
 
             function stopNext() {
                 if (currentIndex < len) {
-                    // 有効な金額の桁：文字を切り出して数字を確定（フリップ表示＋確定SE）
                     const charPos = len - 1 - currentIndex;
                     const digitChar = amountStr.charAt(charPos);
                     const finalValue = parseInt(digitChar);
 
-                    stopDrumRolling(currentIndex, finalValue, activeIntervals[currentIndex], false);
-                    currentIndex++;
-                    
-                    // 次の桁の確定スケジュール
-                    setTimeout(stopNext, speedMs);
+                    // ★ 最高位（一番上の位）の判定：ここだけ回転をさらにゆっくりにして最高の溜めを作る！
+                    if (currentIndex === len - 1 && len > 1) {
+                        const boardMsg = document.getElementById('board-message');
+                        if (boardMsg) {
+                            boardMsg.innerText = "注目の最高位…！果たして金額は！？";
+                            boardMsg.className = "text-center h-auto mt-2 text-sm md:text-xl font-black text-amber-300 animate-pulse tracking-widest";
+                        }
+
+                        // 回転速度をさらにじっくりスローダウンさせてゴールドに輝かせる
+                        activeIntervals[currentIndex] = slowDownDrumRolling(currentIndex, activeIntervals[currentIndex]);
+
+                        // 溜め時間を3.0秒に延長し、満を持して数字を「ピキーン！」と確定！
+                        setTimeout(() => {
+                            stopDrumRolling(currentIndex, finalValue, activeIntervals[currentIndex], false);
+                            currentIndex++;
+                            setTimeout(stopNext, 500);
+                        }, 3000);
+                    } else {
+                        stopDrumRolling(currentIndex, finalValue, activeIntervals[currentIndex], false);
+                        currentIndex++;
+                        setTimeout(stopNext, speedMs);
+                    }
                 } else {
                     // 【極上演出】最高位（一番上の位）が確定した瞬間、
                     // それより左側の残りのパタパタ（千万・億など不要な位）を一斉に、瞬時に停止して消灯させる
@@ -816,7 +856,7 @@
             }
 
             const targetVal = currentItem.actualValue;
-            const speed = 600; // 0.6秒間隔でパタパタ進む
+            const speed = 1000; // 1.0秒間隔で一桁ずつじっくりパタパタ進む
 
             const mainActionBtn = document.getElementById('btn-main-action');
             if (mainActionBtn) mainActionBtn.disabled = true;
